@@ -1,0 +1,60 @@
+name: Import PathWise AI source
+
+on:
+  push:
+    paths:
+      - 'PathWise-AI-GitHub-Ready.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Extract project files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import sys
+          import zipfile
+
+          archive = Path("PathWise-AI-GitHub-Ready.zip")
+          if not archive.exists():
+              print("Project archive is already imported; nothing to do.")
+              sys.exit(0)
+
+          with zipfile.ZipFile(archive) as project:
+              project.testzip()
+              project.extractall(".")
+          source = Path("PathWise AI")
+          if not source.is_dir():
+              raise SystemExit("Expected 'PathWise AI' folder was not found in the archive.")
+
+          for item in source.iterdir():
+              destination = Path(item.name)
+              if item.is_dir():
+                  shutil.copytree(item, destination, dirs_exist_ok=True)
+              else:
+                  shutil.copy2(item, destination)
+
+          shutil.rmtree(source)
+          archive.unlink()
+          PY
+      - name: Commit imported source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "Import PathWise AI application source"
+          git push origin main
